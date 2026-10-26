@@ -1,5 +1,6 @@
 """P0 / phase 3: the fair price process (GBM), its validation against Black-Scholes, and a correlated market."""
 from __future__ import annotations
+from scipy.stats import norm
 
 import numpy as np
 
@@ -12,7 +13,16 @@ def simulate_gbm(s0: float, mu: float, sigma: float, T: float,
     Column 0 is s0, column j is the value at time j * T / n_steps.
     Use np.random.default_rng(seed) so results are reproducible.
     """
-    raise NotImplementedError
+    S = np.zeros((n_paths, n_steps + 1))
+    dt = T / n_steps
+    S[:,0] = s0
+    rng = np.random.default_rng(seed)
+    Z = rng.standard_normal((n_paths, n_steps))
+    for j in range(n_steps):
+      S[:,j+1] = S[:,j]*np.exp((mu - ((sigma)**2)/2)*dt + sigma*np.sqrt(dt)*Z[:,j] )
+    return S
+
+    
 
 
 def simulate_gbm_at_times(s0: float, mu: float, sigma: float, times, n_paths: int = 1,
@@ -25,12 +35,27 @@ def simulate_gbm_at_times(s0: float, mu: float, sigma: float, times, n_paths: in
     used with that dt, so the law of the price does not depend on how often you look.
     Raise ValueError if times is not strictly increasing or its first value is <= 0.
     """
-    raise NotImplementedError
+    times = np.concatenate(([0.0], times))
+    dt = np.diff(times)
+    if not np.all(dt>0):
+      raise ValueError
+    S = np.zeros((n_paths, len(dt)+1))
+    S[:,0] = s0
+    rng = np.random.default_rng(seed)
+    Z = rng.standard_normal((n_paths, len(dt)))
+    for j in range(len(dt)):
+        S[:,j+1] = S[:,j]*np.exp((mu - ((sigma)**2)/2)*dt[j] + sigma*np.sqrt(dt[j])*Z[:,j] )
+    return S[:,1:]
 
 
 def bs_call(s0: float, k: float, r: float, sigma: float, T: float) -> float:
     """Black-Scholes price of a European call (no dividends)."""
-    raise NotImplementedError
+    d2 = (np.log(s0/k) + (r - ((sigma**2)/2))*T )/(sigma*np.sqrt(T))
+    d1 = d2 + sigma*np.sqrt(T)
+    Nd2 = norm.cdf(d2)
+    Nd1 = norm.cdf(d1)
+    bs_call_price = s0*Nd1 - k*np.exp(-r*T)*Nd2
+    return bs_call_price
 
 
 def bs_delta(s0: float, k: float, r: float, sigma: float, T: float) -> float:
@@ -49,7 +74,21 @@ def mc_call_price(s0: float, k: float, r: float, sigma: float, T: float,
       Draw n_paths/2 normals Z and use their mirrors -Z, average the payoff of each pair,
       and compute the standard error from those n_paths/2 pair averages.
     """
-    raise NotImplementedError
+    st = np.zeros((n_paths))
+    gain = np.zeros(n_paths)
+    gain_act = np.zeros(n_paths)
+    rng = np.random.default_rng(seed)
+    Z = rng.standard_normal((n_paths))
+    for i in range(n_paths):
+      st[i] = s0*np.exp((r - ((sigma)**2)/2)*T + sigma*np.sqrt(T)*Z[i])
+      gain[i] = max(st[i] - k, 0)
+      gain_act[i] = np.exp(-r*T)*gain[i]
+    prix = np.mean(gain_act)
+    ecart_type = np.std(gain_act, ddof=1)
+    erreur = ecart_type/np.sqrt(n_paths)
+    return (prix,erreur)
+
+
 
 
 def simulate_market(mu, cov, n_days: int, seed: int | None = None, s0: float = 100.0,
