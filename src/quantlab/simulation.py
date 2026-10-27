@@ -74,18 +74,42 @@ def mc_call_price(s0: float, k: float, r: float, sigma: float, T: float,
       Draw n_paths/2 normals Z and use their mirrors -Z, average the payoff of each pair,
       and compute the standard error from those n_paths/2 pair averages.
     """
-    st = np.zeros((n_paths))
-    gain = np.zeros(n_paths)
+    st_plus = np.zeros(n_paths)
+    gain_plus = np.zeros(n_paths)
+    st_neg = np.zeros((n_paths//2))
+    gain_neg = np.zeros(n_paths//2)
     gain_act = np.zeros(n_paths)
+    moyenne = np.zeros(n_paths//2)
     rng = np.random.default_rng(seed)
     Z = rng.standard_normal((n_paths))
-    for i in range(n_paths):
-      st[i] = s0*np.exp((r - ((sigma)**2)/2)*T + sigma*np.sqrt(T)*Z[i])
-      gain[i] = max(st[i] - k, 0)
-      gain_act[i] = np.exp(-r*T)*gain[i]
-    prix = np.mean(gain_act)
-    ecart_type = np.std(gain_act, ddof=1)
-    erreur = ecart_type/np.sqrt(n_paths)
+
+    if antithetic == True and n_paths % 2 != 0:
+      raise ValueError
+    
+    elif antithetic:
+      st_plus = np.zeros(n_paths//2)
+      gain_plus = np.zeros(n_paths//2)
+      gain_act = np.zeros(n_paths//2)
+      Z = rng.standard_normal((n_paths//2))
+      Z_neg = (-1)*Z
+      for j in range(n_paths//2):
+        st_plus[j] = s0*np.exp((r - ((sigma)**2)/2)*T + sigma*np.sqrt(T)*Z[j])
+        st_neg[j] = s0*np.exp((r - ((sigma)**2)/2)*T + sigma*np.sqrt(T)*Z_neg[j])
+        gain_plus[j] = max(st_plus[j] - k, 0)
+        gain_neg[j] = max(st_neg[j] - k, 0)
+        moyenne[j]= (gain_plus[j]+gain_neg[j])/2
+        gain_act[j] = np.exp(-r*T)*moyenne[j]
+      prix = np.mean(gain_act)
+      ecart_type = np.std(gain_act, ddof=1)
+      erreur = ecart_type/np.sqrt(n_paths//2)
+    else:   
+      for i in range(n_paths):
+        st_plus[i] = s0*np.exp((r - ((sigma)**2)/2)*T + sigma*np.sqrt(T)*Z[i])
+        gain_plus[i] = max(st_plus[i] - k, 0)
+        gain_act[i] = np.exp(-r*T)*gain_plus[i]
+      prix = np.mean(gain_act)
+      ecart_type = np.std(gain_act, ddof=1)
+      erreur = ecart_type/np.sqrt(n_paths)
     return (prix,erreur)
 
 
