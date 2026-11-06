@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import numpy as np
+import heapq
 
 
 def poisson_arrival_times(rate: float, horizon: float, seed: int | None = None) -> np.ndarray:
@@ -11,7 +12,18 @@ def poisson_arrival_times(rate: float, horizon: float, seed: int | None = None) 
     (Another valid method: draw N ~ Poisson(rate * horizon), then N sorted uniforms on [0, horizon].)
     If rate <= 0, return an empty array. Use np.random.default_rng(seed).
     """
-    raise NotImplementedError
+    t = 0
+    instants = []
+    if rate <= 0:
+        return np.array([])
+    rng = np.random.default_rng(seed)
+    while t <= horizon:
+        durée = rng.exponential(1/rate)
+        t += durée
+        if t > horizon:
+            break
+        instants.append(t)
+    return np.array(instants)
 
 
 def merge_event_streams(streams: dict[str, "np.ndarray"]) -> list[tuple[float, str]]:
@@ -21,7 +33,25 @@ def merge_event_streams(streams: dict[str, "np.ndarray"]) -> list[tuple[float, s
     Do it with a heap (heapq), like "merge k sorted lists": O(N log k), not by concatenating and sorting.
     Beware of Python's late-binding closures if you build generators in a loop.
     """
-    raise NotImplementedError
+    tas = []
+    for rang, (etiquette, tableau) in enumerate(streams.items()):
+        if len(tableau) == 0:
+            continue
+        evenement = (tableau[0], rang, 0, etiquette)
+        heapq.heappush(tas, evenement)
+    sortie = []
+    while tas:
+        instant, rang, indice, etiquette = heapq.heappop(tas)
+        sortie.append((instant, etiquette))
+        indice += 1
+        if indice < len(streams[etiquette]):
+            evenement_suivant = (streams[etiquette][indice], rang, indice, etiquette)
+            heapq.heappush(tas, evenement_suivant)
+    return sortie
+
+   
+
+    
 
 
 def generate_order_flow(lam_buy: float, lam_sell: float, horizon: float,
