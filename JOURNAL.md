@@ -84,3 +84,46 @@ Une entrée par session. Cinq lignes suffisent. Ce journal sert à te souvenir d
 **Ce qui m'a bloqué (et combien de temps) :** `enumerate(liste, 1)`, f-strings et `join`, `rng.integers` (borne haute exclue, `np.int64` n'est pas un `int`), où appeler `chrono()`.
 **Ce que j'ai compris (une phrase, avec mes mots) :** Le temps total ne prouve pas la complexité, il la rend seulement plausible. Pour prouver O(log n) il faudrait mesurer le temps par opération en fonction de la taille du carnet. Ligne de CV : « Carnet d'ordres en Python (tas + suppression paresseuse) : 100 000 opérations en 0,19 s sur un MacBook (~2 µs/op) ».
 **Question à laquelle je ne sais pas encore répondre :** le temps par opération reste-t-il quasi plat si le carnet contient 10 fois plus d'ordres posés ? (Non mesuré.)
+
+## Vendredi 6 novembre (soirée) : P2, début
+
+**Date / durée :** ven. 6 nov., de 18 h à 21 h 45 environ, avec des pauses.
+**Module et fonction(s) :** P2, feuille de maths (étapes 1 à 3), `poisson_arrival_times`, `merge_event_streams`.
+**Ce que j'ai fait :**
+- Démontré à la main que le temps d'attente entre deux clients est exponentiel : P(T > t) = P(N(t) = 0) = e^(−λt). Calculé sa densité, son espérance 1/λ et son écart-type 1/λ.
+- Montré l'absence de mémoire : P(T > s+u | T > s) = P(T > u).
+- Montré que pour deux flux indépendants, le premier événement arrive après un temps exponentiel de taux λ_b + λ_s, et que c'est un achat avec la probabilité λ_b / (λ_b + λ_s) (formule des probabilités totales).
+- Codé `poisson_arrival_times` (somme cumulée de durées exponentielles, jusqu'à l'horizon) : tests verts.
+- Codé `merge_event_streams` (fusion de flux triés avec un tas de tuples (instant, rang, indice, étiquette)) : tests verts.
+**Ce qui m'a bloqué (et combien de temps) :**
+- Poisson contre exponentielle : j'ai mis du temps à voir que ce sont deux regards sur le même processus (on compte les clients, ou on attend le suivant).
+- J'ai voulu additionner les **taux** au lieu des **durées** pour fabriquer les instants d'arrivée.
+- `for i in range(horizon+1)` au lieu d'un `while` : on ne sait pas à l'avance combien de clients arrivent.
+- `if not tableau` plante sur un tableau numpy (alors que ça marche sur une liste) : il faut `len(tableau) == 0`.
+- Le design du tuple du tas (quoi mettre, dans quel ordre) et la logique « on remet le suivant du même flux », surtout `streams[etiquette][indice]`. Environ 1 h 30 sur `merge_event_streams`.
+**Ce que j'ai compris (une phrase, avec mes mots) :** Les temps entre clients sont exponentiels et sans mémoire, donc on fabrique les arrivées en additionnant des durées tirées au hasard. Pour fusionner plusieurs flux déjà triés, le tas contient le prochain événement de chaque flux : le plus petit est forcément le prochain de tous, et on remet ensuite le suivant du flux qui vient de sortir.
+**Question à laquelle je ne sais pas encore répondre :** comment fabriquer deux flux vraiment indépendants (achats et ventes) à partir d'une seule graine, tout en restant reproductible ?
+
+## Samedi 7 novembre : P2, fin
+
+**Date / durée :** sam. 7 nov., de 11 h 45 à 13 h 25 environ.
+**Module et fonction(s) :** P2, `generate_order_flow`, `scripts/p2_flow.py` (trois expériences).
+**Ce que j'ai fait :**
+- Codé `generate_order_flow` : deux flux de Poisson indépendants (deux graines tirées d'un même `seed` avec `rng.integers`), fusionnés par `merge_event_streams`. 9/9 tests verts.
+- Expérience 1 : les temps d'attente (λ = 2) suivent la densité λ·e^(−λt). Moyenne mesurée 0,497 pour 0,5 attendu.
+- Expérience 2 : le nombre de clients sur 5 s (λ = 2) suit une loi de Poisson de paramètre 10. Moyenne 10,01 et variance 9,81 (théorie : égales à 10).
+- Expérience 3 : avec λ_b = 3 et λ_s = 1, la fréquence des achats est 0,7508 pour 0,75 attendu (erreur standard 0,003).
+**Ce qui m'a bloqué (et combien de temps) :**
+- Les deux flux doivent être indépendants : avec la même graine, achats et ventes auraient les mêmes instants.
+- Une variable passée comme argument nommé (`rate = 2` dans l'appel) n'existe pas comme variable : il faut la définir avant.
+- `sum(1 for _, cote in flux if cote == "buy")` : la structure avec condition, et le fait qu'un couple se défait en autant de noms qu'il a d'éléments. Environ 30 min sur les expériences au total.
+**Ce que j'ai compris (une phrase, avec mes mots) :** Un flux de Poisson se simule en additionnant des durées exponentielles, et on peut le vérifier de trois façons indépendantes : la loi des attentes (exponentielle), la loi des comptes (Poisson, moyenne = variance), et la part des achats (λ_b / (λ_b + λ_s)). La comparaison d'une simulation à la théorie doit toujours se faire avec une erreur standard, pas à l'œil.
+**Question à laquelle je ne sais pas encore répondre :** que se passe-t-il si les taux ne sont pas constants dans la journée (ouverture et clôture plus actives), ou si les ordres arrivent par grappes ? Le Poisson homogène ne suffit plus.
+
+
+**Défense orale P2 (7 nov., en anglais, de mémoire) :**
+- Question 4 (attente restante de 10 minutes) : comprise. Réponse : 5 minutes, par absence de mémoire.
+- Question 2 : l'importance pour la simulation est comprise (à chaque tour on tire une durée exponentielle indépendante du passé). La démonstration en 3 lignes (conditionnelle, simplification du numérateur, calcul avec e^(−λt)) est encore à refaire de mémoire.
+- Question 1 : à refaire. Erreur : j'ai écrit « arrive à l'instant t » au lieu de « arrive après t » (T > t ⇔ N(t) = 0 ⇔ aucun client dans [0, t]). Il faut donner la valeur e^(−λt) et dire pourquoi toutes les durées sont exponentielles (le processus repart de zéro).
+- Question 3 : la loi (exponentielle de taux λ_b + λ_s) et la formule λ_b/(λ_b + λ_s) sont justes. Erreurs : « on additionne les taux » sans dire que c'est le produit des probabilités qui l'explique, et « intégration par parties » alors que c'est une intégrale d'exponentielle simple.
+- Question 5 : méthode et O(N log k) justes. Erreurs : condition d'arrêt inversée (« tant que le tas n'est pas vide »), et j'ai oublié de comparer avec « concaténer puis trier » en O(N log N), moins bon quand k est petit devant N.
