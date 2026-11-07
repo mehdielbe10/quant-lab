@@ -127,3 +127,19 @@ Une entrée par session. Cinq lignes suffisent. Ce journal sert à te souvenir d
 - Question 1 : à refaire. Erreur : j'ai écrit « arrive à l'instant t » au lieu de « arrive après t » (T > t ⇔ N(t) = 0 ⇔ aucun client dans [0, t]). Il faut donner la valeur e^(−λt) et dire pourquoi toutes les durées sont exponentielles (le processus repart de zéro).
 - Question 3 : la loi (exponentielle de taux λ_b + λ_s) et la formule λ_b/(λ_b + λ_s) sont justes. Erreurs : « on additionne les taux » sans dire que c'est le produit des probabilités qui l'explique, et « intégration par parties » alors que c'est une intégrale d'exponentielle simple.
 - Question 5 : méthode et O(N log k) justes. Erreurs : condition d'arrêt inversée (« tant que le tas n'est pas vide »), et j'ai oublié de comparer avec « concaténer puis trier » en O(N log N), moins bon quand k est petit devant N.
+
+## Samedi 7 novembre (après-midi et soir) : P3, feuille de maths et markov.py
+
+**Date / durée :** sam. 7 nov., de 14 h à 20 h 50 environ, avec une pause.
+**Module et fonction(s) :** P3, feuille de maths (questions 1 à 3), `markov.py` : `birth_death_transition_matrix`, `absorption_analysis`, `simulate_inventory_exit`.
+**Ce que j'ai fait :**
+- Montré que, face à des clients non informés, chaque exécution rapporte la demi-fourchette h, et que le gain sur le stock q·ΔV a une espérance nulle (E[ΔV] = 0 et q indépendant de ΔV) mais une variance q²·Var(ΔV) non nulle : c'est le risque de stock.
+- Résolu à la main l'analyse au premier pas pour L = 2 et p = 1/2 : E = (3, 4, 3), E_0 = 4 = L², et h = (1/4, 1/2, 3/4).
+- Mis le système sous forme matricielle : P = [[Q, R], [0, I]], E = (I − Q)⁻¹·1 (temps moyen avant absorption), B = (I − Q)⁻¹R (probabilités d'absorption). Vérifié que (I − Q)·E = 1.
+- Codé la matrice de transition (ordre naturel −L…+L), `absorption_analysis` (découpage en Q et R avec `np.ix_`, résolution avec `np.linalg.solve`) et `simulate_inventory_exit` (Monte Carlo). 5/5 tests verts, y compris celui qui compare la simulation au calcul exact.
+**Ce qui m'a bloqué (et combien de temps) :**
+- Pourquoi mettre sous forme de matrice, et ce que sont Q et R, les états absorbants et transitoires : environ 1 h, réglé avec l'exemple minimal L = 1.
+- Matrice de transition : j'avais mis les états transitoires d'abord au lieu de l'ordre naturel exigé par la fonction (le réordonnement se fait dans `absorption_analysis`). J'avais aussi des indices hors limites (`m[n, n]`) et un indice −1 qui boucle en Python.
+- `while (stock != L) or (stock != −L)` est toujours vrai (il faut `and`, loi de De Morgan), `pas += 1` mal indenté (hors du `while`), et `rng.random(0, 1)` au lieu de `rng.random()`. Environ 20 minutes au total.
+**Ce que j'ai compris (une phrase, avec mes mots) :** Le stock du market maker est une chaîne de Markov absorbante : l'état suivant ne dépend que du stock actuel, et les limites ±L sont des états absorbants. Le temps moyen avant d'atteindre une limite se calcule exactement avec (I − Q)⁻¹·1 (valant L² quand p = 1/2, et de l'ordre de L/|2p − 1| sinon), sans simuler, puis je le vérifie par Monte Carlo.
+**Question à laquelle je ne sais pas encore répondre :** le moteur complet (carnet + flux + prix) donnera-t-il le même temps moyen que la formule exacte ? C'est le test de demain. Et que se passe-t-il quand le prix bouge (σ > 0) et que le market maker se fait toucher de façon asymétrique ?
