@@ -49,9 +49,9 @@ def merge_event_streams(streams: dict[str, "np.ndarray"]) -> list[tuple[float, s
             heapq.heappush(tas, evenement_suivant)
     return sortie
 
-   
 
-    
+
+
 
 
 def generate_order_flow(lam_buy: float, lam_sell: float, horizon: float,
@@ -62,4 +62,12 @@ def generate_order_flow(lam_buy: float, lam_sell: float, horizon: float,
     (A client "buy" is a market buy order: it lifts the market maker's ask.)
     Same seed -> same result. Use independent random streams for buys and sells.
     """
-    raise NotImplementedError
+    d = {}
+    rng = np.random.default_rng(seed)
+    graine_achats, graine_ventes = rng.integers(0, 2**31, size=2)
+    achats = poisson_arrival_times(lam_buy, horizon, graine_achats)
+    ventes = poisson_arrival_times(lam_sell, horizon, graine_ventes)
+    d["buy"] = achats
+    d["sell"] = ventes
+    return merge_event_streams(d)
+    
